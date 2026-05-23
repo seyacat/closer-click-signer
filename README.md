@@ -1,7 +1,10 @@
-# @gatoseya/closer-click-signer
+# closer-click-signer
 
 Autoridad de **sello de tiempo** (TSA, *timestamp authority*) del ecosistema
 **CloserClick**. Despliegue canónico: **`https://signer.closer.click`**.
+
+Es solo un **servidor** HTTP: no hay librería cliente, se consume con `fetch`
+plano (ver más abajo). Sin dependencias en runtime.
 
 ## Qué problema resuelve
 
@@ -50,37 +53,57 @@ inyectar por entorno con `TSA_PRIVATE_JWK`. Ver `.env.example`.
 - `ts`: epoch ms del reloj del sellador.
 - CORS abierto (los sellos son públicos, no secretos).
 
-## Cliente (navegador)
+## Uso desde el cliente (fetch plano + WebCrypto)
+
+No hay librería: son llamadas HTTP simples. Esta sección es la **fuente de
+verdad** del protocolo de verificación — replicala exacta o los sellos no
+verificarán.
+
+### Sellar
 
 ```js
-import {
-  sealData, sha256Base64url, sealHash,
-  verifySeal, verifySealBefore, getSignerPubkey,
-} from '@gatoseya/closer-click-signer'
+// hash = SHA-256 del contenido, en base64url (lo que firmás/identificás)
+async function sha256Base64url (bytes) {
+  const d = await crypto.subtle.digest('SHA-256', bytes)
+  return btoa(String.fromCharCode(...new Uint8Array(d)))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
 
-// 1) Sellar el contenido ya firmado por el vault (p. ej. el blob del pronóstico)
-const seal = await sealData(signedBlobBytes)   // { hash, ts, signature, pubkey, ... }
-//   guardá `seal` junto al contenido
-
-// 2) Verificar más tarde (offline), contra la pubkey pineada del sellador
-const trusted = await getSignerPubkey()         // o una pubkey pineada en tu app
-const r = await verifySeal(seal, { hash: await sha256Base64url(signedBlobBytes), pubkey: trusted })
-//   r.valid === true  →  el contenido existía en r.ts
-
-// 3) Atajo "a tiempo": ¿sellado antes del inicio del torneo?
-const ok = await verifySealBefore(seal, TOURNAMENT_START, { hash, pubkey: trusted })
+const res = await fetch('https://signer.closer.click/seal', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ hash }),
+})
+const seal = await res.json()   // { v, op:'seal', hash, ts, alg, signature, pubkey }
+// guardá `seal` junto al contenido
 ```
 
-### API
+### Verificar (offline)
 
-- `sha256Base64url(data)` / `sha256OfCanonical(obj)` → digest base64url.
-- `sealHash(hash, { url? })` / `sealData(data, { url? })` → `Seal`.
-- `getSignerPubkey({ url?, force? })` → JWK string (cacheado).
-- `verifySeal(seal, { hash?, pubkey?, maxFutureMs? })` → `{ valid, ts, reason? }`.
-- `verifySealBefore(seal, deadlineMs, opts)` → además exige `ts < deadlineMs`.
+Lo firmado por el sellador es **exactamente** `canonicalStringify({ op:'seal',
+hash, ts })` (claves ordenadas → `{"hash":...,"op":"seal","ts":...}`). La firma
+es ECDSA P-256 (r‖s) en base64.
 
-Si omitís `pubkey` en la verificación se confía en `seal.pubkey` (TOFU): para
-seguridad real, **pineá** la pubkey del sellador en tu app.
+```js
+const canon = v => (v === null || typeof v !== 'object') ? JSON.stringify(v)
+  : Array.isArray(v) ? '[' + v.map(canon).join(',') + ']'
+  : '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + canon(v[k])).join(',') + '}'
+
+async function verifySeal (seal, expectedHash, trustedPubkeyJwkStr) {
+  if (seal.op !== 'seal' || seal.hash !== expectedHash) return false
+  const jwk = JSON.parse(trustedPubkeyJwkStr)   // PINEÁ esta pubkey en tu app
+  const key = await crypto.subtle.importKey('jwk', jwk,
+    { name: 'ECDSA', namedCurve: 'P-256' }, false, ['verify'])
+  const bytes = new TextEncoder().encode(canon({ op: 'seal', hash: seal.hash, ts: seal.ts }))
+  const sigBin = atob(seal.signature)
+  const sig = Uint8Array.from(sigBin, c => c.charCodeAt(0))
+  return crypto.subtle.verify({ name: 'ECDSA', hash: { name: 'SHA-256' } }, key, sig, bytes)
+}
+// "a tiempo": además exigí seal.ts < TOURNAMENT_START
+```
+
+> **Pineá la pubkey** del sellador en tu app (obtenida una vez de `/pubkey`). No
+> confíes en la `pubkey` que viene dentro del sello para decidir confianza.
 
 ## Licencia
 

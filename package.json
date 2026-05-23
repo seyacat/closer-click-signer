@@ -1,19 +1,10 @@
 {
-  "name": "@gatoseya/closer-click-signer",
+  "name": "closer-click-signer",
   "version": "0.1.0",
-  "description": "Autoridad de sello de tiempo (TSA) del ecosistema CloserClick: firma { hash, ts } con la clave del sellador para probar cuándo existió un contenido, sin verlo. Incluye servidor (signer.closer.click) y cliente de navegador.",
+  "description": "Autoridad de sello de tiempo (TSA) del ecosistema CloserClick: firma { hash, ts } con la clave del sellador para probar cuándo existió un contenido, sin verlo. Servidor desplegado en signer.closer.click.",
   "type": "module",
-  "main": "src/index.js",
-  "module": "src/index.js",
-  "types": "src/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./src/index.d.ts",
-      "import": "./src/index.js"
-    }
-  },
+  "main": "server.js",
   "files": [
-    "src",
     "server.js",
     "README.md",
     "LICENSE"
