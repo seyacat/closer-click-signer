@@ -1,0 +1,42 @@
+{
+  "name": "@gatoseya/closer-click-signer",
+  "version": "0.1.0",
+  "description": "Autoridad de sello de tiempo (TSA) del ecosistema CloserClick: firma { hash, ts } con la clave del sellador para probar cuándo existió un contenido, sin verlo. Incluye servidor (signer.closer.click) y cliente de navegador.",
+  "type": "module",
+  "main": "src/index.js",
+  "module": "src/index.js",
+  "types": "src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src",
+    "server.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "closer-click",
+    "signer",
+    "timestamp",
+    "tsa",
+    "ecdsa",
+    "seal"
+  ],
+  "author": "seyacat",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seyacat/closer-click-signer.git"
+  }
+}
